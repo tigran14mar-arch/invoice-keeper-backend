@@ -1,0 +1,46 @@
+# Запуск всего решения одной командой:  docker compose up --build
+# MySQL поднимается и сама импортирует db/invoice_keeper_db.sql при первом старте.
+services:
+  db:
+    image: mysql:8.0
+    container_name: invoice_keeper_db
+    command: --default-time-zone=+03:00
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${DB_NAME:-invoice_keeper}
+      MYSQL_USER: ${DB_USER:-invoice_keeper}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-invoice_pass}
+      TZ: Europe/Moscow
+    ports:
+      - "${DB_PORT_HOST:-3307}:3306"
+    volumes:
+      - ./db/invoice_keeper_db.sql:/docker-entrypoint-initdb.d/01-invoice_keeper.sql:ro
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${DB_ROOT_PASSWORD:-rootpass}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build: .
+    container_name: invoice_keeper_api
+    env_file: .env
+    environment:
+      # Внутри compose база доступна по имени сервиса, а не по 127.0.0.1
+      DB_HOST: db
+      DB_PORT: 3306
+      # Права на создание функций в дампе требуют root при первом импорте
+      DB_USER: root
+      DB_PASSWORD: ${DB_ROOT_PASSWORD:-rootpass}
+      DB_NAME: ${DB_NAME:-invoice_keeper}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8000}:8000"
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
