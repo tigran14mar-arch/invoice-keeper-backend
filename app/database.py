@@ -35,6 +35,7 @@ REQUIRED_OBJECTS = (
     "budgets",
     "v_payment_occurrences_detailed",
     "v_payments_summary_by_currency",
+    "telegram_messages",
 )
 
 
