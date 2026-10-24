@@ -21,7 +21,8 @@ from __future__ import annotations
 import calendar
 import json
 import logging
-from datetime import date, timedelta
+import secrets
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Optional
 
@@ -1014,3 +1015,77 @@ def set_override_today(value: Optional[date]) -> dict:
     execute("UPDATE system_settings SET override_today = %s WHERE id = 1", (value,))
     ensure_all_periods()
     return get_settings_state()
+
+
+# =============================================================================
+# Привязка Telegram-группы
+# =============================================================================
+
+LINK_CODE_TTL = timedelta(hours=24)
+
+
+def create_link_code(user_id: int) -> dict:
+    """Генерирует одноразовый код привязки (deep link). Возвращает {code, expires, deep_link}."""
+    code = secrets.token_urlsafe(6)
+    expires = datetime.now() + LINK_CODE_TTL
+    execute(
+        "UPDATE users SET tg_link_code = %s, tg_link_expires = %s WHERE id = %s",
+        (code, expires, user_id),
+    )
+    return {"code": code, "expires": expires.isoformat()}
+
+
+def peek_code(code: str) -> Optional[dict]:
+    """Проверяет код привязки без потребления. Возвращает инфо о пользователе или None."""
+    row = query_one(
+        "SELECT id AS user_id, username, telegram_chat_id "
+        "FROM users WHERE tg_link_code = %s AND tg_link_expires > NOW()",
+        (code,),
+    )
+    return dict(row) if row else None
+
+
+def link_chat(code: str, chat_id: str, tg_username: str) -> None:
+    """Привязывает Telegram-группу к пользователю, потребляя код."""
+    execute(
+        "UPDATE users SET telegram_chat_id = %s, telegram_username = %s, "
+        "tg_link_code = NULL, tg_link_expires = NULL "
+        "WHERE tg_link_code = %s AND tg_link_expires > NOW()",
+        (chat_id, tg_username, code),
+    )
+
+
+def unlink_chat(user_id: int) -> None:
+    """Отвязывает Telegram-группу от пользователя."""
+    execute(
+        "UPDATE users SET telegram_chat_id = NULL, telegram_username = NULL WHERE id = %s",
+        (user_id,),
+    )
+
+
+def unlink_by_chat(chat_id: str) -> None:
+    """Отвязывает пользователя от группы по ID чата."""
+    execute(
+        "UPDATE users SET telegram_chat_id = NULL, telegram_username = NULL WHERE telegram_chat_id = %s",
+        (chat_id,),
+    )
+
+
+def migrate_chat(old_chat_id: str, new_chat_id: str) -> None:
+    """Обновляет chat_id при миграции группы в супергруппу."""
+    execute("UPDATE users SET telegram_chat_id = %s WHERE telegram_chat_id = %s", (new_chat_id, old_chat_id))
+    execute("UPDATE telegram_messages SET chat_id = %s WHERE chat_id = %s", (new_chat_id, old_chat_id))
+
+
+def user_by_chat(chat_id: str) -> Optional[dict]:
+    """Находит пользователя по привязанному chat_id."""
+    return query_one(
+        "SELECT id, username, full_name, role, telegram_chat_id FROM users WHERE telegram_chat_id = %s",
+        (chat_id,),
+    )
+
+
+def update_chat_title(chat_id: str, title: str) -> None:
+    """Обновляет название группы (telegram_username как поле для хранения названия)."""
+    if title:
+        execute("UPDATE users SET telegram_username = %s WHERE telegram_chat_id = %s", (title, chat_id))
