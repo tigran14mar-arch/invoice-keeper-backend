@@ -52,6 +52,7 @@ class Settings:
     db_password: str = field(default_factory=lambda: _get("DB_PASSWORD", ""))
     db_name: str = field(default_factory=lambda: _get("DB_NAME", "invoice_keeper"))
     db_pool_size: int = field(default_factory=lambda: _get_int("DB_POOL_SIZE", 8))
+    db_unix_socket: str = field(default_factory=lambda: _get("DB_UNIX_SOCKET"))
 
     # --- Администратор задаётся ТОЛЬКО здесь (Слайд 6, 9): через API его не изменить ---
     admin_username: str = field(default_factory=lambda: _get("ADMIN_USERNAME", "admin"))
@@ -70,6 +71,7 @@ class Settings:
     telegram_bot_token: str = field(default_factory=lambda: _get("TELEGRAM_BOT_TOKEN"))
     telegram_chat_id: str = field(default_factory=lambda: _get("TELEGRAM_CHAT_ID"))
     telegram_paid_button: bool = field(default_factory=lambda: _get_bool("TELEGRAM_PAID_BUTTON", True))
+    telegram_test_link_enabled: bool = field(default_factory=lambda: _get_bool("TELEGRAM_TEST_LINK_ENABLED", False))
 
     # --- Фоновый планировщик ---
     scheduler_interval_seconds: int = field(default_factory=lambda: _get_int("SCHEDULER_INTERVAL_SECONDS", 60))

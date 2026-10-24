@@ -7,3 +7,7 @@ venv/
 .vscode/
 *.log
 .DS_Store
+.local-tools/
+.local-runtime/
+openapi.json
+openapi.yaml

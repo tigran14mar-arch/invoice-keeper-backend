@@ -17,6 +17,7 @@ from datetime import date
 from typing import Any, Optional
 
 from app import services
+from app.config import settings
 from app.database import query_all, query_one
 from app.reminders import (
     CALLBACK_PREFIX,
@@ -38,6 +39,7 @@ HELP_TEXT = (
     "Этот бот рассылает напоминания о регулярных платежах "
     "в привязанные Telegram-группы.\n\n"
     "<b>Команды в группе:</b>\n"
+    "/link — быстрая привязка в тестовом режиме (админ группы)\n"
     "/status — текущие неоплаченные платежи\n"
     "/unlink — отвязать группу (только админ группы)\n"
     "/help — эта справка\n\n"
@@ -110,6 +112,16 @@ def _handle_private(client: Any, message: dict) -> Optional[str]:
         return None
     command, arg = cmd
 
+    if command == "link":
+        client.send("Добавьте меня в тестовую группу и отправьте там /link. "
+                    "Команду должен отправить администратор группы; бот также должен быть администратором "
+                    "для надёжной проверки прав.", chat_id=str(message["chat"]["id"]))
+        return "link_in_group"
+
+    if command == "help" or (command == "start" and not arg):
+        client.send(HELP_TEXT, chat_id=str(message["chat"]["id"]))
+        return "help"
+
     if command != "start" or not arg:
         return None
 
@@ -146,6 +158,9 @@ def _handle_group(client: Any, message: dict, today_: date) -> Optional[str]:
     sender = message.get("from", {})
     sender_id = sender.get("id")
 
+    if command == "link":
+        return _test_link_group(client, chat_id, chat_title, sender)
+
     if command == "start" and arg:
         return _link_group(client, chat_id, chat_title, arg, sender)
 
@@ -160,6 +175,30 @@ def _handle_group(client: Any, message: dict, today_: date) -> Optional[str]:
         return "help"
 
     return None
+
+
+def _test_link_group(client: Any, chat_id: str, chat_title: str, sender: dict) -> str:
+    """Привязка без кода только для явно включённого тестового режима."""
+    if not settings.telegram_test_link_enabled:
+        client.send("Тестовая привязка выключена. Используйте ссылку из панели управления.", chat_id=chat_id)
+        return "test_link_disabled"
+    if not sender.get("id") or not client.is_chat_admin(chat_id, sender["id"]):
+        client.send("Команду /link может выполнить только администратор группы. "
+                    "Добавьте бота в администраторы, чтобы он мог проверить ваши права.", chat_id=chat_id)
+        return "forbidden"
+    if services.user_by_chat(chat_id):
+        client.send("Эта группа уже привязана. Проверка: /status", chat_id=chat_id)
+        return "already_linked"
+    user = query_one("SELECT id, telegram_chat_id FROM users WHERE username = %s AND is_env_admin = TRUE AND is_active = TRUE",
+                     (settings.admin_username,))
+    if not user:
+        client.send("Тестовый администратор приложения не найден.", chat_id=chat_id)
+        return "admin_not_found"
+    if user.get("telegram_chat_id"):
+        client.send("Уже привязана другая тестовая группа. Сначала выполните /unlink в ней.", chat_id=chat_id)
+        return "other_group_linked"
+    code = services.create_link_code(user["id"])["code"]
+    return _link_group(client, chat_id, chat_title, code, sender)
 
 
 def _link_group(

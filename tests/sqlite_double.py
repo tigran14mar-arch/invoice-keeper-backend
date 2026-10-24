@@ -28,11 +28,11 @@ from decimal import Decimal
 from typing import Any, Iterator, Optional, Sequence
 
 # --- значения .env для тестовой среды (до импорта app.config) ---
-os.environ.setdefault("ADMIN_USERNAME", "admin")
-os.environ.setdefault("ADMIN_PASSWORD", "admin12345")
-os.environ.setdefault("ADMIN_FULL_NAME", "Администратор")
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "")
-os.environ.setdefault("TELEGRAM_CHAT_ID", "")
+os.environ["ADMIN_USERNAME"] = "admin"
+os.environ["ADMIN_PASSWORD"] = "admin12345"
+os.environ["ADMIN_FULL_NAME"] = "Администратор"
+os.environ["TELEGRAM_BOT_TOKEN"] = ""
+os.environ["TELEGRAM_CHAT_ID"] = ""
 
 ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 ISO_DATETIME = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$")

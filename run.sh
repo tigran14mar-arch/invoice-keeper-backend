@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Запуск бэкенда на Linux и macOS
-set -e
+set -euo pipefail
 cd "$(dirname "$0")"
 
 if [ ! -f .env ]; then
@@ -10,7 +10,7 @@ if [ ! -f .env ]; then
 fi
 
 if [ ! -d .venv ]; then
-  python3 -m venv .venv
+  "${PYTHON:-python3}" -m venv .venv
 fi
 ./.venv/bin/pip install -q --upgrade pip
 ./.venv/bin/pip install -q -r requirements.txt

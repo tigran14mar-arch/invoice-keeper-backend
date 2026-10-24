@@ -112,8 +112,9 @@ class ApiContract(unittest.TestCase):
             )
 
     def test_openapi_is_served_from_api_v1(self):
-        self.assertEqual(main.app.kwargs.get("openapi_url"), "/api/v1/openapi.json")
-        self.assertIsNone(main.app.kwargs.get("docs_url"), "Swagger должен быть на /api/v1/docs")
+        config = getattr(main.app, "kwargs", {})
+        self.assertEqual(getattr(main.app, "openapi_url", config.get("openapi_url")), "/api/v1/openapi.json")
+        self.assertIsNone(getattr(main.app, "docs_url", config.get("docs_url")), "Swagger должен быть на /api/v1/docs")
 
 
 if __name__ == "__main__":

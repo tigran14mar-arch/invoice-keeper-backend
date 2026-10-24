@@ -1,0 +1,13 @@
+.git
+.env
+.env.*
+.venv
+venv
+.local-tools
+.local-runtime
+__pycache__
+**/__pycache__
+*.pyc
+*.log
+.DS_Store
+._*

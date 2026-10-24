@@ -64,6 +64,7 @@ def init_pool() -> None:
             autocommit=True,
             connection_timeout=10,
             use_pure=True,
+            **({"unix_socket": settings.db_unix_socket} if settings.db_unix_socket else {}),
         )
     except mysql.connector.Error as exc:
         raise DatabaseError(_friendly_error(exc)) from exc
@@ -184,7 +185,9 @@ def check_schema() -> None:
     if missing:
         raise DatabaseError(
             "В базе не хватает объектов: " + ", ".join(missing) +
-            ". Импортируйте db/invoice_keeper_db.sql (см. README)."
+            ". Для новой базы импортируйте db/invoice_keeper_db.sql, затем "
+            "db/migration_group_bot.sql. Для существующей базы примените только "
+            "недостающую миграцию (см. README); основной дамп удаляет данные."
         )
     functions = query_all(
         "SELECT ROUTINE_NAME AS name FROM information_schema.ROUTINES "

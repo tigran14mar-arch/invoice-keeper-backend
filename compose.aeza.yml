@@ -1,0 +1,11 @@
+# На этом сервере Telegram доступен по IPv6 хоста, но не из IPv4 bridge.
+# docker compose -f docker-compose.yml -f compose.aeza.yml up -d --no-deps api
+services:
+  api:
+    network_mode: host
+    ports: !reset []
+    environment:
+      DB_HOST: 127.0.0.1
+      DB_PORT: ${DB_PORT_HOST:-3307}
+      TELEGRAM_TEST_LINK_ENABLED: "false"
+    command: ["uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"]
