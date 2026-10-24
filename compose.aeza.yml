@@ -8,4 +8,4 @@ services:
       DB_HOST: 127.0.0.1
       DB_PORT: ${DB_PORT_HOST:-3307}
       TELEGRAM_TEST_LINK_ENABLED: "false"
-    command: ["uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"]
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
