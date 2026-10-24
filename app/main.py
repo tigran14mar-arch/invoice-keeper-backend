@@ -75,6 +75,14 @@ ADMIN_ONLY = "Доступно только администратору."
 BACKGROUND_TASKS: list[asyncio.Task] = []
 
 
+async def _trigger_reminder_cycle() -> None:
+    """Запускает цикл напоминаний вне расписания (при добавлении платежа с близким сроком)."""
+    try:
+        await asyncio.to_thread(reminders.run_reminder_cycle)
+    except Exception:  # noqa: BLE001
+        log.exception("Ошибка при срочном цикле напоминаний")
+
+
 def _export_openapi() -> None:
     """Сохраняет актуальную спецификацию рядом с кодом: openapi.json и openapi.yaml.
 
@@ -112,7 +120,7 @@ async def lifespan(app: FastAPI):
     _export_openapi()
     if not settings.telegram_enabled:
         log.warning("Telegram не настроен: напоминания отправляться не будут "
-                    "(заполните TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID в .env)")
+                    "(заполните TELEGRAM_BOT_TOKEN в .env)")
     if settings.scheduler_enabled:
         BACKGROUND_TASKS.append(asyncio.create_task(reminders.scheduler_task()))
         BACKGROUND_TASKS.append(asyncio.create_task(reminders.callback_task()))
@@ -335,6 +343,11 @@ async def create_recurring_payment(
                  "start_date": str(payment["start_date"])},
         ip_address=client_ip(request),
     )
+    # Если до срока < 3 дней — запускаем цикл напоминаний сразу
+    if settings.telegram_enabled:
+        asyncio.get_event_loop().call_soon(
+            lambda: asyncio.create_task(_trigger_reminder_cycle())
+        )
     return payment
 
 
@@ -674,6 +687,41 @@ async def delete_user(
         details={"username": user["username"]}, ip_address=client_ip(request),
     )
     return Message(detail=f"Пользователь {user['username']} удалён")
+
+
+# =============================================================================
+# Привязка Telegram-группы
+# =============================================================================
+
+@app.post(
+    f"{API}/users/{{user_id}}/telegram-link",
+    tags=["Пользователи"],
+    summary="Генерация кода привязки Telegram-группы",
+    description=ADMIN_ONLY + " Возвращает код и deep link для добавления бота в группу.",
+    responses={404: {"model": ErrorResponse, "description": "Пользователь не найден"}},
+)
+async def create_telegram_link(
+    user_id: int,
+    request: Request,
+    admin: Annotated[CurrentUser, Depends(require_admin)],
+) -> dict:
+    # Проверяем, что пользователь существует
+    services.get_user(user_id)
+    result = services.create_link_code(user_id)
+    bot_token = settings.telegram_bot_token
+    if bot_token:
+        # Получаем username бота для deep link
+        from app.reminders import get_client
+        client = get_client()
+        if client:
+            bot_name = client.bot_username()
+            result["deep_link"] = f"https://t.me/{bot_name}?startgroup={result['code']}"
+    log_action(
+        admin.username, admin.role, "CREATE_TG_LINK",
+        entity_type="user", entity_id=user_id,
+        ip_address=client_ip(request),
+    )
+    return result
 
 
 # =============================================================================
