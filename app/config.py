@@ -81,7 +81,7 @@ class Settings:
 
     @property
     def telegram_enabled(self) -> bool:
-        return bool(self.telegram_bot_token and self.telegram_chat_id)
+        return bool(self.telegram_bot_token)
 
     @property
     def tzinfo(self) -> ZoneInfo:
